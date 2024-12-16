@@ -1,17 +1,23 @@
+## The purpose of this script is to calculate spatial position per day per meerkat 
+## This script uses the spatial metrics calculated using the CCAS standardized method over a 10m discretization 
+## It includes spatial metrics calculated every second (1 second fixes) 
+## Turning angles calculated based on past and future 10m of movement per individual and relative to the centroid's past and future 10m of movement
 
-load("C:/Users/Rasek/Downloads/Archive 2/00_Data/output/10m_2023-03-16.RData")
-setwd("C:/Users/Rasek/Downloads/Archive 2/00_Data/output/10m_2023-03-16.RData")
+
+
 library(dplyr)
 library(tidyr)
+library(ggplot2)
 
-rm(list=ls()) #clear the working environment 
+#load the data
+load("00_Data/output/10m_2024-12-06.RData")
 
 #convert to a tibble for easier handling
 spatialMetrics <- spatialMetrics %>% as_tibble()
 spatialMetrics
 
 #check that data is present for all expected meerkats
-#this cod creates a list of each session and each meerkat 
+#this code creates a list of each session and each meerkat 
 points <- spatialMetrics %>% as_tibble() %>% group_by(session, format(date, "%Y"), indUniqID) %>% summarise(points=sum(!is.na(relX)))
 points
 
@@ -21,16 +27,18 @@ spatialMetrics <- spatialMetrics %>% drop_na(relX)
 #drop 2022-06-16, no data collected on this day
 spatialMetrics <- spatialMetrics %>% filter(date!="2022-06-16")
 
-
-
 #join with indiviudal info to add sex and original meerkat code 
-spatialMetrics
 spatialMetrics <- spatialMetrics %>% 
   left_join(allIndInfo %>% dplyr::select(code, DOB, sex, indUniqID=uniqueID), by="indUniqID")
 
+#calculated distance moved per second
+spatialMetrics <- spatialMetrics %>% arrange(code, t) %>% mutate(indDist = if_else(t-lag(t)==1, sqrt((lag(x) - x)^2 + (lag(y) - y)^2), NA))
+spatialMetrics %>% dplyr::select(code, t, indDist)
+summary(spatialMetrics$indDist)
 
 #selecting just the metrics that we need for the position analysis
-spatialMetrics2 <- spatialMetrics %>% dplyr::select(session, date, t, code, status, sex, DOB, relX, relY, relativeAngle, frontBackPosition, inFrontHalf, IndRankAlongMvmtAxis)
+spatialMetrics2 <- spatialMetrics %>% 
+  dplyr::select(session, date, t, tIdx, code, status, sex, DOB, relX, relY, relativeAngle, frontBackPosition, inFrontHalf, IndRankAlongMvmtAxis, indDist, indSpeedPast)
 #relativeAngle is the meerkat's position relative to the centroid
 #frontBackPosition = distance in meters from the front to the back 
 #inFrontHalf = binary variable for front/back
@@ -38,6 +46,7 @@ spatialMetrics2 <- spatialMetrics %>% dplyr::select(session, date, t, code, stat
 #IndRankAlongMvmtAxis = ranked position along movement axis 
 #relY = left right distance from the centroid
 #relX = front back distance from the centroid
+
 
 #add a position variable based on dividing the centroid into four quandrants
 spatialMetrics2 <- spatialMetrics2 %>% mutate(position = case_when(
@@ -52,7 +61,7 @@ spatialMetrics2 <- left_join(spatialMetrics2, spatialMetrics2 %>%
   group_by(t) %>%
   summarise(median.dist=median(distance)))
 
-#add individual distance and then create a second distance variable with center, front, side, and back 
+#add individual distance from center and then create a second distance variable with center, front, side, and back 
 spatialMetrics2 <- spatialMetrics2 %>% mutate(
   distance=sqrt((relX)^2 + (relY)^2),
   position2 = if_else(distance < median.dist, "center", position)
@@ -98,6 +107,22 @@ cor.test(sum5$meanRank, sum5$meanPositionRanked) #highly correlated
 #add ranked metrics to the main dataframe
 spatialMetrics3 <- left_join(spatialMetrics3, sum5)
 spatialMetrics3
+
+
+#add distance moved and speed 
+sum6 <- spatialMetrics2 %>% group_by(date, code) %>%
+  summarise(
+    totalDist = sum(indDist, na.rm=TRUE), 
+    secs=sum(!is.na(indDist)), 
+    avgSpeed = mean(indSpeedPast, na.rm=TRUE),
+    distPerSec = totalDist/secs)
+sum6
+spatialMetrics3 <- left_join(spatialMetrics3, sum6)
+
+
+
+
+
 
 #check if these levels are accurate
 levels(as.factor(spatialMetrics3$status))
@@ -152,4 +177,4 @@ spatialMetrics3 <- spatialMetrics3 %>% mutate(
   center = if_else(is.na(center), 0, center))
 drop_na(spatialMetrics3) #check to see if any NAs, all good 
 
-write.csv(x=spatialMetrics3, file="01_Weight_And_Position/01_Data/PositionDataAll_2023.09.04.csv", row.names=FALSE)
+write.csv(x=spatialMetrics3, file="01_Output/PositionDataAll_2024.12.06.csv", row.names=FALSE)
