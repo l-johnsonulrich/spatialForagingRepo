@@ -6,7 +6,7 @@ library(tidyr)
 
 rm(list=ls()) #clear the working environment 
 
-weightDiffs <- read.csv("C:/Users/Rasek/Downloads/Archive 2/03_Data/Weight_Differences_all.csv") %>% as_tibble()
+weightDiffs <- read.csv("03_Output/Weight_Differences_all.csv") %>% as_tibble()
 weightDiffs
 
 #specify dates as dates
@@ -20,7 +20,7 @@ weightDiffs
 
 weightDiffs %>% group_by(date, code) %>% filter(n()>1) #no duplicates 
 
-spatialData <- read.csv("C:/Users/Rasek/Downloads/Archive 2/01_Data/PositionDataAll_2023.09.04.csv") %>% as_tibble()
+spatialData <- read.csv("01_Output/PositionDataAll_2024.12.06.csv") %>% as_tibble()
 spatialData
 
 #specify dates as dates
@@ -50,4 +50,4 @@ positionAndWeight <- positionAndWeight %>% mutate(session = case_when(
 positionAndWeight %>% group_by(code, session) %>% summarise(status=first(status2)) %>% arrange(session) %>% print(n=Inf)
 
 
-write.csv(positionAndWeight, "01_Weight_And_Position/04_Data/positionAndWeight.csv", row.names = FALSE)
+write.csv(positionAndWeight, "04_Output/positionAndWeight20241206.csv", row.names = FALSE)
