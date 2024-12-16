@@ -2,8 +2,7 @@
 
 rm(list=ls()) #clear the working environment 
 
-setwd("~/Documents/movecall_playbacks")
-source("1_obs_scripts/functions.R")
+source("00_Data/input/functions.R")
 
 sessions <- c("NQ2022", "SI2022", "RW2022", "HM2017","HM2019","L2019", "RW2021", "ZU2021","NQ2021")
 discretizationStep = 10 #lag for the spatial discretization (in meters) - default 10
@@ -13,7 +12,7 @@ print('creating info table for all sessions')
 allIndInfo <- data.frame()
 for(session in sessions){
   
-  longNames <- c(load(paste0("/Users/lijohn/OneDrive - Michigan State University/Documents_UZH/Meerkats/Field/13_MosiaMSc/PositionDataWithPlaybacks/data/level1/",session,"_COORDINATES_SYNCHED_level1.RData")))
+  longNames <- c(load(paste0("00_Data/input/",session,"_COORDINATES_SYNCHED_level1.RData")))
   shortNames <- simplifyNames(pat=paste(session,"_",sep=""))
   indInfo$session <- session
   indInfo$idx <- 1:nrow(indInfo)
@@ -30,7 +29,7 @@ for(session in sessions){
   timestamp()
   
   #loading spatial data and making names easier
-  longNames <- c(load(paste0("/Users/lijohn/OneDrive - Michigan State University/Documents_UZH/Meerkats/Field/13_MosiaMSc/PositionDataWithPlaybacks/data/level1/",session,"_COORDINATES_SYNCHED_level1.RData")))
+  longNames <- c(load(paste0("00_Data/input/",session,"_COORDINATES_SYNCHED_level1.RData")))
   shortNames <- simplifyNames(pat=paste(session,"_",sep=""))
   
   #get number of individuals
@@ -48,6 +47,10 @@ for(session in sessions){
   
   spatialPastNoRemove <- relativePos(allX,allY,step=discretizationStep,discrSpatial=T,futur=F,timeline=timeLine,discrByCentroid=T,centroidSpeed = T, removeInd = F) #metrics based on past
   rankAlongAxis <- apply(spatialPastNoRemove$relative_ind_X,2,normalize)
+  
+  #add absolute x and y
+  sessionTable$x <- allX[cbind(sessionTable$indIdx, sessionTable$tIdx)]
+  sessionTable$y <- allY[cbind(sessionTable$indIdx, sessionTable$tIdx)]
   
   #add the individual-level metrics to the table (which do not depend on whether focal is left out of group-level measures or not)
   sessionTable$pastStepDuration <- spatialPast$ind_stepDuration[cbind(sessionTable$indIdx, sessionTable$tIdx)]
@@ -121,12 +124,12 @@ spatialMetrics$frontBackPosition <- spatialMetrics$relX
 
 #Individual front-back movement
 spatialMetrics$frontBackMovement <- spatialMetrics$indGroupSpeedDiffAlongGroupAxis*60
-
+ 
 spatialMetrics$t <- as.POSIXct(spatialMetrics$t,tz="UTC")
 spatialMetrics <- spatialMetrics[order(spatialMetrics$t),]
 
 spatialMetrics$session <- factor(spatialMetrics$session,levels=sessions)
 
-save(file = paste0('/Users/lijohn/OneDrive - Michigan State University/Documents_UZH/Meerkats/Field/13_MosiaMSc/PositionDataWithPlaybacks/data/output/',discretizationStep,"m_", Sys.Date(), '.RData'), list = c('spatialMetrics','allIndInfo'))
+save(file = paste0('/Users/lijohn/Dropbox/Documents_UZH/Meerkats/MSc Students/MosiaMSc/11_MosiaMSc/01_Weight_And_Position/00_Data/output/',discretizationStep,"m_", Sys.Date(), '.RData'), list = c('spatialMetrics','allIndInfo'))
 
 
