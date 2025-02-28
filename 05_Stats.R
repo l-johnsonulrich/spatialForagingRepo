@@ -185,30 +185,36 @@ test(emmeans(m4, ~age2), null= 0.25) #additive effect of age
 intercepts = c("frontP" = 0.125, "backP" = 0.125, "centreP" = 0.5, "sideP" = 0.25)
 # Define a colorblind-friendly palette
 
-#Plot Figure 1
-tiff("Figure1.tiff", width = 8, height = 6, units = 'in', res = 300)
+
+#Plot Figure 2
+tiff("Figure2.tiff", width = 8, height = 6, units = 'in', res = 300)
 #plot code
 Position_and_weight %>% mutate(frontP = predict(m1), backP = predict(m2), centreP=predict(m3), sideP=predict(m4)) %>%
   dplyr::select(code, session, date, rank, sex, age2, frontP, backP, centreP, sideP) %>%
   mutate(status = case_when(
     rank == "dominant" ~ "Dominant",
-    rank == "subordinate" & age2 =="adult" ~ "Older Subordinate", 
-    rank == "subordinate" & age2 == "subadult" ~ "Younger Subordinate")) %>% 
+    rank == "subordinate" & age2 =="adult" ~ "Older subordinate", 
+    rank == "subordinate" & age2 == "subadult" ~ "Younger subordinate")) %>% 
   pivot_longer(cols = c(frontP, backP, centreP, sideP), names_to = "position", values_to = "proportion") %>%
   ggplot(aes(x=status, y=proportion, fill=factor(sex, labels=c("Female", "Male")))) +
   geom_violin(position = position_dodge(0.9)) +
-  geom_boxplot(position = position_dodge(0.9), color="lightgray", alpha=.0, width=.1) +
-  facet_wrap(~factor(position, levels=c("frontP", "backP", "sideP", "centreP"), labels=c("Front", "Back", "Side", "Center")), scales="free")+
+  geom_boxplot(position = position_dodge(0.9), color="black", alpha=.0, width=.1) +
+  facet_wrap(~factor(position, levels=c("frontP", "backP", "sideP", "centreP"), labels=c("Front", "Back", "Side", "Centre")), scales="free")+
   geom_hline(data = data.frame(position = names(intercepts), yintercept = intercepts), aes(yintercept = yintercept), linetype = "dashed", color = "gray") + 
-  labs(x = "Social Status", y = "Estimated Marginal Mean Proportion", fill = "Sex") + 
+  labs(x = "Social status", y = "Estimated marginal mean proportion", fill = "Sex") + 
   theme_bw() + 
   theme(legend.position = 'top', 
         panel.grid.major = element_blank(), 
         text = element_text(family = "Times New Roman"),
         axis.text.x = element_text(size = 8, color= "black")) + # Adjust font size of x-axis labels
   scale_x_discrete(labels = label_wrap_gen(width = 5)) +
-  scale_color_manual(values = c("#440154FF", "#22A884FF"))+
-  scale_fill_manual(values = c("#440154FF", "#22A884FF"))
+  theme(
+    panel.grid.major = element_blank(),  # Remove major gridlines
+    panel.grid.minor = element_blank()   # Remove minor gridlines
+  ) +
+  scale_y_continuous(labels = scales::label_number(drop0trailing=TRUE)) +
+  scale_color_manual(values = c("#DDAA33", "#004488"))+
+  scale_fill_manual(values = c("#DDAA33", "#004488"))
 dev.off()
 
 
@@ -403,7 +409,7 @@ estimate_slopes(zmeanRank, trend="meanRank", by=c("sex", "rank"))
 estimate_slopes(zmeanRank, trend="meanRank", by=c("age2"))
 
 
-tiff("Figure2.tiff", width = 8, height = 6, units = 'in', res = 300)
+tiff("Figure3.tiff", width = 8, height = 6, units = 'in', res = 300)
 Position_and_weight %>% 
   mutate(predictedFrontBinary = predict(zfront.bin), 
          predictedRank = predict(zmeanRank)) %>%
@@ -415,13 +421,53 @@ Position_and_weight %>%
              y = predicted, color = sex, fill=sex)) +
   geom_point() +
   geom_smooth(method = "lm") +
-  facet_grid(factor(age2, labels=c("Older", "Younger"))*factor(rank, labels=c("Dominant", "Subordinate")) ~ factor(position, labels=c("Binary Location", "Ranked Location")), scales = "free_x") + 
-  labs(x = "Frontness Score", y = "Predicted Weight Gain", color = "Sex", fill="Sex") + 
+  facet_grid(factor(age2, labels=c("Older", "Younger"))*factor(rank, labels=c("Dominant", "Subordinate")) ~ factor(position, labels=c("Binary location", "Ranked location")), scales = "free_x") + 
+  labs(x = "Frontness score", y = "Predicted weight gain", color = "Sex", fill="Sex") + 
   theme_bw() + 
   theme(legend.position = 'top', 
         panel.grid.major = element_blank(), 
         text = element_text(family = "Times New Roman"),
         axis.text.x = element_text(size = 8, color= "black")) + # Adjust font size of x-axis labels
-  scale_color_manual(values = c("#440154FF", "#22A884FF"))+
-  scale_fill_manual(values = c("#440154FF", "#22A884FF"))
+  scale_color_manual(values = c("#DDAA33", "#004488"))+
+  scale_fill_manual(values = c("#DDAA33", "#004488")) +
+  scale_x_continuous(labels = scales::label_number(drop0trailing=TRUE))+
+  theme(
+    panel.grid.major = element_blank(),  # Remove major gridlines
+    panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
 dev.off()
+
+
+
+#manually adding the regression lines from models? 
+slopes <- emmeans(zfront.bin, ~front.bin*rank*age2*sex, at = list(front.bin = seq(0.17, 0.89, by = 0.01)), type="response") %>% as_tibble() %>%
+  mutate(position="predictedFrontBinary", frontness=front.bin) %>% dplyr::select(rank, age2, sex, emmean, position, frontness, lower.CL, upper.CL)
+slopes <- add_row(slopes, emmeans(zmeanRank, ~meanRank*rank*age2*sex, at = list(meanRank = seq(-.54, .64, by = 0.01)), type="response") %>% as_tibble() %>%
+            mutate(position="predictedRank", frontness=meanRank) %>% dplyr::select(rank, age2, sex, emmean, position, frontness, lower.CL, upper.CL))
+slopes <- slopes %>% filter(!(rank=="dominant" & age2=="subadult"))
+
+points <- Position_and_weight %>% 
+  mutate(predicted = predict(zfront.bin), position="predictedFrontBinary", frontness=front.bin) %>%
+  dplyr::select(predicted, frontness, position, age2, sex, rank)
+points <- add_row(points, Position_and_weight %>% 
+          mutate(predicted = predict(zmeanRank), position="predictedRank", frontness=meanRank) %>%
+          dplyr::select(predicted, frontness, position, age2, sex, rank))         
+
+ggplot() +
+  geom_point(data=points, aes(x = frontness, y = predicted, color = sex, fill=sex)) +
+  geom_path(data=slopes, aes(x=frontness, y=emmean, color=sex, fill=sex)) +
+  geom_ribbon(data = slopes, aes(x = frontness, ymin = lower.CL, ymax = upper.CL, fill = sex), alpha = 0.2) +
+  facet_grid(factor(age2, labels=c("Older", "Younger"))*factor(rank, labels=c("Dominant", "Subordinate")) ~ factor(position, labels=c("Binary location", "Ranked location")), scales = "free") +
+  labs(x = "Frontness score", y = "Predicted weight gain", color = "Sex", fill="Sex") + 
+  theme_bw() + 
+  theme(legend.position = 'top', 
+        panel.grid.major = element_blank(), 
+        text = element_text(family = "Times New Roman"),
+        axis.text.x = element_text(size = 8, color= "black")) + # Adjust font size of x-axis labels
+  scale_color_manual(values = c("#DDAA33", "#004488"))+
+  scale_fill_manual(values = c("#DDAA33", "#004488")) +
+  scale_x_continuous(labels = scales::label_number(drop0trailing=TRUE))+
+  theme(
+    panel.grid.major = element_blank(),  # Remove major gridlines
+    panel.grid.minor = element_blank()   # Remove minor gridlines
+  )
